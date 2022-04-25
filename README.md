@@ -154,7 +154,7 @@ sudo reposync -p ~/ansible/ --download-metadata --repo=rhel-8-appstream-rhui-rpm
   - The mirror host serves as the bastion, or jump box
 
 ```
-
+ssh -i ~/.ssh/ansible_mirror.pem ec2-user@<public-ip-mirror-host>
 ```
 
 ### Copy the keypair
