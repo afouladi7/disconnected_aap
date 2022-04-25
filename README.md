@@ -150,12 +150,6 @@ sudo reposync -p ~/ansible/ --download-metadata --repo=rhel-8-appstream-rhui-rpm
 - Route 53
   - Add an A record `aap` pointing to the private IP of the aap instance
 
-- SSH into the mirror host, and then ssh into the aap host
-  - The mirror host serves as the bastion, or jump box
-
-```
-ssh -i ~/.ssh/ansible_mirror.pem ec2-user@<public-ip-mirror-host>
-```
 
 ### Copy the keypair
 
@@ -166,6 +160,13 @@ scp ~/.ssh/ansible_mirror.pem ec2-user@<public-ip-mirror-host>:~/.ssh/
 ```
 
 ### SSH into AAP Host
+
+- SSH into the mirror host, and then ssh into the aap host
+  - The mirror host serves as the bastion, or jump box
+
+```
+ssh -i ~/.ssh/ansible_mirror.pem ec2-user@<public-ip-mirror-host>
+```
 
 ```
 ssh -i ~/.ssh/ansible_mirror.pem ec2-user@aap.ansiblemirror.com
