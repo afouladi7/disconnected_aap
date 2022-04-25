@@ -243,7 +243,7 @@ Example:
 sshuttle -r ec2-user@54.211.183.248 10.0.135.16/24 --dns
 ```
 
-You will now be able to access the controller via your workstation's web browser at `https://aap.ansiblemirror.com`
+You will now be able to access the controller via your workstation's web browser at `http://aap.ansiblemirror.com`
 
 
 
