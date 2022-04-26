@@ -27,15 +27,15 @@ For the purposes of this guide, we will be using the Red Hat (internal) Product 
 
 Open the "Services" catalog in the top left hand corner of the AWS Console and search for navigate to the "VPC" Service.
 
-![AWS Console, VPC Service](img/step_1_vpc/service-catalog-vpc.png)
+![AWS Console, VPC Service](img/1_vpc/service-catalog-vpc.png)
 
 At the top of the VPC Dashboard click the "Launch VPC Wizard" button to begin creating our VPC and subnets.
 
-![Launch VPC Wizard](img/step_1_vpc/launch-vpc-wizard.png)
+![Launch VPC Wizard](img/1_vpc/launch-vpc-wizard.png)
 
 On the "Create VPC" page in the "VPC Settings" column we will configure our VPC as follows:
 
-![Create VPC](img/step_1_vpc/create-vpc-1.png)
+![Create VPC](img/1_vpc/create-vpc-1.png)
 
 |                           |                                              |
 | ------------------------- | -------------------------------------------- |
@@ -59,27 +59,52 @@ On the "Create VPC" page in the "VPC Settings" column we will configure our VPC 
 | Enable DNS resolution     | Enabled (default)                            |
 
 Example:
-![VPC settings 1](img/step_1_vpc/create-vpc-2.png)
-![VPC settings 2](img/step_1_vpc/create-vpc-3.png)
+![VPC settings 1](img/1_vpc/create-vpc-2.png)
+![VPC settings 2](img/1_vpc/create-vpc-3.png)
 
 ! Take note of the IPv4 CIDR block. We will need this later in establishing our sshuttle tunnel into the VPC to access our deployed resources from our workstation.
 
 Finally, click "Create VPC".
 
-### VPC & Subnets
+![Create VPC workflow](img/1_vpc/create-vpc-workflow.png)
 
-- VPC Settings -> VPC, subnets, etc.
-- Auto-generate name and tag (e.g. ansible)
-- IPv4 CIDR Blocks -> Default
-- 3 Availability Zones
-- 3 Private & 3 Public Subnets
-- No NAT gateway
-- VPC endpoints: None
-- Enable DNS hostname
-- Enable DNS resolution
-- [Create]
+Once the "Create VPC workflow" has completed we can move on by clicking the "View VPC" button at the bottom of the page.
 
-## EC2
+![Your VPCs](img/1_vpc/vpc-created.png)
+
+## Step 2 - EC2 Security Group
+
+We will need to create a security group that limits the inbound and outbound traffic allowed to and from the RHEL instances we will be deploying. You can create a security group when you deploy an EC2 instance, but we are conducting this step beforehand to consolidate the process of creating one of the inbound rules. We will be defining two inbound rules in this security group. One rule allows for SSH traffic from anywhere. The other rule, which will have to be added after the security group has already been created, modifying the existing security group created in the first part of this section, to allow for all traffic originating from within the security group. In other words we are locking down the security group to allow for SSH traffic originating from anywhere, and allowing a host within the security group accept any kind of traffic from another host within the security group.
+
+To begin, we will navigate to the AWS Console Service Catalog, search for and navigate to the EC2 Service page.
+
+![EC2 Service](img/2_ssg/ec2-service.png)
+
+On the EC2 Dashboard we will navigate to the Security Group section from the "Resouces" card by clicking on the "Security Groups" link.
+
+![EC2 Dash - Security Group link](img/2_ssg/ec2-dash-ssg.png)
+
+Once you reach the Security Groups dashboard, you will notice that there is already a default security group defined. We will leave that one as it is, and we will begin creating our own security group by clicking the "Create security group" button in the top right of the page.
+
+![SSG Dash](img/2_ssg/ssg-dash.png)
+
+On the "Create security group" page we will fill out the fields for "Security group name", "Description", and make sure that the automatically selected VPC is correct.
+
+From there we will add a single Inbound rule by clicking the "Add rule" on the "Inbound rules" card. In fields for the newly created rule, in the "Type" column select "SSH" from the dropdown menu, and in the "Source" column select "Anywhere - IPv4" from the dropdown menu. You're newly created security group should look like the folowing before continuing by clicking the "Create security group" button at the bottom right of the page.
+
+![Create SSG 1A](img/2_ssg/create-ssg-1a.png)
+![Create SSG 1B](img/2_ssg/create-ssg-1b.png)
+
+The second step is to modify or newly created `aap_lab_ssg` to allow all traffic from within the security group.
+After creating the Security Group you will be taken to the `aap_lab_ssg` Security Group dashboard. To add another inbound rule, select the "Edit inbound rules" button on the "Inbound rules" card at the bottom of the page.
+
+![Edit inbound rules](img/2_ssg/edit-inbound-rules.png)
+
+On the "Edit inbound rules" page, create a new rule by clicking "Add rule" and fill out the new rule "Type" with "All traffic" from the dropdown menu. In the "Source" column, select the security group `aap_lab_ssg` by clicking the magnifying glass and scrolling down until you find the correct security group. You're new rule should look similar to the below example, but note that the security group id will be different from the example.
+
+![Edit inbound rules 2](img/2_ssg/edit-inbound-rules-2.png)
+
+Once you have completed editing the security group rules, proceed by clicking "Save rules" at the bottom of the page.
 
 ### Elastic IPs
 
