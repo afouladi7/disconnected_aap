@@ -19,7 +19,52 @@ From there we will pull the setup bundle (installer) to the controller instance,
 
 Once the newly depolyed Ansible Automation Controller installation has completed we will utilize the `sshuttle` utility to create a tunneled connection to the private subnet so that we can access the Ansible Automation Controller web user interface from our workstation's browser.
 
-## Create VPC
+## AWS Environment
+
+For the purposes of this guide, we will be using the Red Hat (internal) Product Demo System's Open Envrionment. Under the services catalog, the "AWS Blank Open Environment" service is listed in the "Red Hat Open Environments" folder. Order your open environment and once you are logged into the AWS console you will have a clean AWS account to proceed forward with this guide.
+
+## Step 1 - Virtual Private Cloud (VPC) setup
+
+Open the "Services" catalog in the top left hand corner of the AWS Console and search for navigate to the "VPC" Service.
+
+![AWS Console, VPC Service](img/step_1_vpc/service-catalog-vpc.png)
+
+At the top of the VPC Dashboard click the "Launch VPC Wizard" button to begin creating our VPC and subnets.
+
+![Launch VPC Wizard](img/step_1_vpc/launch-vpc-wizard.png)
+
+On the "Create VPC" page in the "VPC Settings" column we will configure our VPC as follows:
+
+![Create VPC](img/step_1_vpc/create-vpc-1.png)
+
+|                           |                                              |
+| ------------------------- | -------------------------------------------- |
+| Resources to create       | Select "VPC, subnets, etc."                  |
+|                           |                                              |
+| Name tag auto-generation  |                                              |
+| Auto-generate             | Enabled                                      |
+|                           | Provide a name for your VPC (e.g. `aap_lab`) |
+| IPv4 CIDR block           | Leave default (i.e. 10.0.0.0/16)             |
+| IPv6 CIDR block           | Select "No IPv^ CIDR block (default)         |
+| Tenency                   | Default                                      |
+|                           |                                              |
+| Availability Zones (AZs)  | 1                                            |
+| Number of public subnets  | 1                                            |
+| Number of private subnets | 1                                            |
+| NAT gateways ($)          | None                                         |
+| VPC endpoints             | None                                         |
+|                           |                                              |
+| DNS options               |                                              |
+| Enable DNS hostname       | Enabled (not default)                        |
+| Enable DNS resolution     | Enabled (default)                            |
+
+Example:
+![VPC settings 1](img/step_1_vpc/create-vpc-2.png)
+![VPC settings 2](img/step_1_vpc/create-vpc-3.png)
+
+! Take note of the IPv4 CIDR block. We will need this later in establishing our sshuttle tunnel into the VPC to access our deployed resources from our workstation.
+
+Finally, click "Create VPC".
 
 ### VPC & Subnets
 
