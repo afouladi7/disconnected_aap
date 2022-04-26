@@ -1,5 +1,24 @@
 # Disconnected Ansible Automation Platform 2.1 on AWS
 
+In this document we will outline the process of setting up an AWS environment and deploying Ansible Automation Platform 2.1 on a disconnected RHEL host. To do so we will be setting up a jump-box host that is on a public subnet as the intermediary for the private subnet which will contain our "disconnected" Ansible Automation Platform 2.1 Automation Controller.
+
+## General Architecture
+
+We will create a VPC to host our 2x Subnets. One subnet will be public and the other will be private. We will deploy our jump-box instance in the public subnet and the controller instance in the private subnet.
+
+The jump-box will serve two purposes for this architecture. It will be our bastion to the private subnet (i.e. from our workstation we will ssh into the jump-box instance to then be able to ssh into the conroller instance from the jump-box). The jump-box will also serve as a webserver providing the required resources to the controller instance. The jump-box webserver will host two resources, making them available to the "disconnected" controller instance:
+
+- Ansible Automation Platform setup bundle (installer), and
+- a mirrored copy of the two Red Hat Enterprise Linux (RHEL) 8 repositories required for the installation process, namely the BaseOS and AppStream
+
+These resources will be hosted on the jump-box instance using podman to run a conainterized httpd server.
+
+On the (private) controller instance, we will need to edit the yum repos files to disable to default RHUI repository definitions and create two new repository definitions to instruct the controller host to utilize the repositories hosted on the jump-box.
+
+From there we will pull the setup bundle (installer) to the controller instance, unpack it, edit the intaller inventory file, and run the installation.
+
+Once the newly depolyed Ansible Automation Controller installation has completed we will utilize the `sshuttle` utility to create a tunneled connection to the private subnet so that we can access the Ansible Automation Controller web user interface from our workstation's browser.
+
 ## Create VPC
 
 ### VPC & Subnets
@@ -128,7 +147,9 @@ wget -O setup-bundle.tar.gz -c "<the link you copied from the downloads page>"
 ```
 
 #### Mirror the required RHEL 8 repositories
+
 On the mirror host
+
 ```
 sudo reposync -p ~/ansible/ --download-metadata --repo=rhel-8-baseos-rhui-rpms
 sudo reposync -p ~/ansible/ --download-metadata --repo=rhel-8-appstream-rhui-rpms
@@ -149,7 +170,6 @@ sudo reposync -p ~/ansible/ --download-metadata --repo=rhel-8-appstream-rhui-rpm
 
 - Route 53
   - Add an A record `aap` pointing to the private IP of the aap instance
-
 
 ### Copy the keypair
 
@@ -215,19 +235,23 @@ cd ansible-automation-platform-setup-bundle-2.1.1-2
 ```
 
 Edit the inventory file:
+
 ```
 vi inventory
 ```
 
 Run the installer:
+
 ```
 sudo ./setup.sh
 ```
 
 ### sshuttle access
+
 If for using sshuttle to connect to the AAP Controller Host you may need to install python on the mirror instance for sshuttle to be able to create the required tunnel to the private network.
 
 On the mirror instance:
+
 ```
 sudo yum install python3 -y
 ```
@@ -235,20 +259,15 @@ sudo yum install python3 -y
 On the workstation, you will need to install sshuttle. Check the [sshuttle documentation](https://sshuttle.readthedocs.io/en/stable/overview.html) for the installation method for you workstation's host.
 
 Once sshuttle is installed, to initiate the tunnel to allow you to access the AAP controller run the following in a terminal window (this will run in the background).
+
 ```
 sshuttle -r ec2-user@<mirror-instance-public-ip> <private-cidr-ip-network/cidr-block-size>
 ```
+
 Example:
+
 ```
 sshuttle -r ec2-user@54.211.183.248 10.0.135.16/24 --dns
 ```
 
 You will now be able to access the controller via your workstation's web browser at `http://aap.ansiblemirror.com`
-
-
-
-
-
-
-
-
