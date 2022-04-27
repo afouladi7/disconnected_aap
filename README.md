@@ -115,10 +115,21 @@ Once you have completed editing the security group rules, proceed by clicking "S
 
 ### Instances
 
+Next we will begin depolying our EC2 instances.
+Navigate to the EC2 Instances dashboard within the EC2 Service Dashboard"
+
 #### Bastion Host
+
+![Instance Wizard - Bastion 1](img/3_bastion/bastion-1.png)
+![Instance Wizard - Bastion 2](img/3_bastion/bastion-2.png)
+![Instance Wizard - Bastion 3](img/3_bastion/bastion-3.png)
+![Instance Wizard - Bastion 4](img/3_bastion/bastion-4.png)
+![Instance Wizard - Bastion 5](img/3_bastion/bastion-5.png)
+![Instance Wizard - Bastion 6](img/3_bastion/bastion-6.png)
 
 - Launch Instance
 - Use the `ami-0b0af3577fe5e3532` ami images
+  - This is a gold image provided by Red Hat
 - t2.xlarge instace (4 vCPUs, 16 GiB Memory)
 - Step 3: Configure Instance Details
   - Ensure it is in the correct VPC
@@ -143,66 +154,102 @@ Once you have completed editing the security group rules, proceed by clicking "S
     - Provide the private IP address
     - Allocate
 
-- Key Pair
-- Find your downloaded keypair
+### Key Pair
+
+- Find your downloaded keypair. In my case it was located at `~/Downloads/aap_lab.pem`
+
 - Move it to the ~/.ssh/ directory
 
   ```
-  chmod 600 ~/.ssh/ansible_mirror.pem
+  mv ~/Downloads/aap_lab.pem ~/.ssh/
+  ```
+
+- Set the required permissions on our keyfile:
+
+  ```
+  chmod 600 ~/.ssh/aap_lab.pem
   ```
 
 - SSH into the instance
 
   ```
-  ssh -i ~/.ssh/ansible_mirror.pem ec2-user@<public-ip-address>
+  ssh -i ~/.ssh/aap_lab.pem ec2-user@<bastion-public-ip>
   ```
 
 - Prepare the host
 
   ```
-  sudo yum install podman wget -y
+  sudo yum install podman wget python3 -y
   ```
 
+### Route 53 private hosted zone (optional)
+
 - Create a private dns with route 53 (optional)
+
   - Hosted Zones
+
     - Create Hosted Zone
-      - Domain name: ansiblemirror.com
+      - Domain name: lab.private
       - Make sure this is a `Private hosted zone`
       - Assign the private domain to the correct VPC
       - "Create"
-    - Create a record
-      - Record name: mirror
-      - A record
-      - Grab the private IP address of the mirror instance
-      - Set that to the value of the record
-    - Confirm the records
-      - On the mirror host:
-        ```
-        yum install bind-utils -y
-        nslookup mirror.ansiblemirror.com
-        ```
+    - Create records
+      - We will be creating two A records within our private hosted zone. One for the bastion and one for the controller. If you do not have the _**private IPv4**_ addresses for you two newly created instances, take a moment to jump back over to the EC2 Instances dashboard and make a note of those now.
+      - For each record we will configure them as follows:
+        | | |
+        |-|-|
+        | Record name | The respective record name (i.e. either `bastion` or `controller`)
+        | Record type | A record |
+        | Value | the private IPv4 address of the instance |
+      - Once you have filled in the above fields, contine by selecting "Create records"
+
+    (Optional) Confirm the records
+    On the bastion host:
+
+    ```
+    yum install bind-utils -y
+    nslookup bastion.lab.private
+    ```
 
 ### Mirror Host Setup
 
-- On the mirror host
+- On the bastion host
 
-  - Create ansible directory
-    ```
-    mkdir ansible
-    ```
-  - Login to the registry
+- Create the webserv directory
+
+  ```
+  mkdir ~/webserv
+  ```
+
+- Login to the `registry.redhat.io` container registry
 
   ```
   podman login registry.redhat.io
   ```
 
+- Setup run and configure the container for hosting a simple http file server
+
   ```
-  podman run -d --name httpd -p 8080:8080 --restart=always -v /home/ec2-user/ansible:/var/www/html:Z rhel8/httpd-24
+  podman run -d --name httpd -p 8080:8080 --restart=always -v /home/ec2-user/webserv:/var/www/html:Z rhel8/httpd-24
   podman exec -it httpd rm /etc/httpd/conf.d/welcome.conf
   podman restart httpd
   ```
 
 - Ensure the container is up and running:
+
+  ```
+  podman ps
+  ```
+
+  Example output:
+
+  ```
+  CONTAINER ID  IMAGE                                     COMMAND               CREATED         STATUS             PORTS                   NAMES
+  522788ae4e68  registry.redhat.io/rhel8/httpd-24:latest  /usr/bin/run-http...  40 minutes ago  Up 40 minutes ago  0.0.0.0:8080->8080/tcp  httpd
+  ```
+
+  ! Legacy check step !
+  Does not work with the locked down security group. To be deleted.
 
   - Go to your browser and go to the public IP of the Elastic IP, port 8080 (i.e. http://54.211.183.248:8080)
 
@@ -210,10 +257,10 @@ Once you have completed editing the security group rules, proceed by clicking "S
 
 - Go to you access.redhat.com account, go to the downloads section for Ansible Automation Platform and locate the Ansible Automation Platform 2.1.x Setup Bundle.
 - Right Click the `Download Now` and copy the link address to you clipboard.
-- Then on the mirror host:
+- Then on the bastion host:
 
 ```
-wget -O setup-bundle.tar.gz -c "<the link you copied from the downloads page>"
+wget -O ~/webserv/setup-bundle.tar.gz -c "<the link you copied from the downloads page>"
 ```
 
 #### Mirror the required RHEL 8 repositories
@@ -221,8 +268,8 @@ wget -O setup-bundle.tar.gz -c "<the link you copied from the downloads page>"
 On the mirror host
 
 ```
-sudo reposync -p ~/ansible/ --download-metadata --repo=rhel-8-baseos-rhui-rpms
-sudo reposync -p ~/ansible/ --download-metadata --repo=rhel-8-appstream-rhui-rpms
+sudo reposync -p ~/webserv/ --download-metadata --repo=rhel-8-baseos-rhui-rpms
+sudo reposync -p ~/webserv/ --download-metadata --repo=rhel-8-appstream-rhui-rpms
 ```
 
 #### AAP Instance
@@ -246,23 +293,50 @@ sudo reposync -p ~/ansible/ --download-metadata --repo=rhel-8-appstream-rhui-rpm
 From you workstation:
 
 ```
-scp ~/.ssh/ansible_mirror.pem ec2-user@<public-ip-mirror-host>:~/.ssh/
+[user@workstation]$ scp ~/.ssh/aap_lab.pem ec2-user@<bastion-public-ip>:~/.ssh/
 ```
 
 ### SSH into AAP Host
 
-- SSH into the mirror host, and then ssh into the aap host
-  - The mirror host serves as the bastion, or jump box
+- SSH into the bastion host, and then from there ssh into the controller host
 
 ```
-ssh -i ~/.ssh/ansible_mirror.pem ec2-user@<public-ip-mirror-host>
+[user@workstation]$ ssh -i ~/.ssh/aap_lab.pem ec2-user@<bastion-public-ip>
 ```
 
 ```
-ssh -i ~/.ssh/ansible_mirror.pem ec2-user@aap.ansiblemirror.com
+[ec2-user@bastion]$ ssh -i ~/.ssh/aap_lab.pem ec2-user@controller.lab.private
 ```
 
-Disable yum repos and add local yum mirror repo
+### Disable the default RHUI yum repos
+
+Disable the default yum repos that point to the RHUI infrastructure. We will be defining our own repo file that points to the bastion instance, so we can run the following to disable all currently defined repos.
+
+```
+[ec2-user@controller]$ sudo sed -i 's/enabled=1/enabled=0/g' /etc/yum.repos.d/*.repo
+```
+
+Next we will create our own yum repo definitions as follows:
+
+```
+$ cat << EOF | sudo tee -a /etc/yum.repos.d/bastion.repo
+[rhel-8-baseos-mirror]
+name = Local Mirror of RHEL 8 BaseOS RPMs
+baseurl = http://bastion.lab.private:8080/rhel-8-baseos-rhui-rpms/
+enabled = 1
+gpgcheck = 1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+
+[rhel-8-appstream-rhui-mirror]
+name = Local Mirror of RHEL 8 AppStream rhui
+baseurl = http://bastion.lab.private:8080/rhel-8-appstream-rhui-rpms/
+enabled = 1
+gpgcheck = 1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+EOF
+```
+
+<!--- COMMENT START: old meathod, switching to using sed for disabling the repos and tee for creating a new repo file pointing to the bastion
 
 ```
 sudo vi /etc/yum.repo.d/redhat-rhui.repo
@@ -280,40 +354,197 @@ sudo vi /etc/yum.repo.d/redhat-rhui-client-config.repo
 sudo vi /etc/yum.repo.d/redhat-rhui.repo
 ```
 
-At the bottom of the page enter the following
+COMMENT END -->
+
+### Pull the setup bundle to the controller host
+
+First we will install `wget` to confirm that the repos that we have mirrored onto the bastion host and configured on the controller host and to avoid having to utilize `curl` to pull the setup bundle from the bastion.
 
 ```
-[rhel-8-baseos-mirror]
-name = Local Mirror of RHEL 8 BaseOS RPMs
-baseurl = http://mirror.ansiblemirror.com:8080/rhel-8-baseos-rhui-rpms/
-enabled = 1
-gpgcheck = 0
-
-[rhel-8-appstream-rhui-mirror]
-name = Local Mirror of RHEL 8 AppStream rhui
-baseurl = http://mirror.ansiblemirror.com:8080/rhel-8-appstream-rhui-rpms/
-enabled = 1
-gpgcheck = 0
+[ec2-user@controller]$ sudo yum install wget -y
 ```
 
-### Pull the bundler to the local machine
+Hopefully everything is configured correctly and you were able to install the wget package from the mirrored `rhel-8-appstream-rhui-mirror` repository. If not, please go back figure out where you may have made a mistake.
+
+> In the event that your mirrors are not configured correctly, check to make sure that you are allowing all traffic initiation within the security group as an inbound traffic rule for the security group for the hosts. Additionally, check to make sure that the container is running on the bastion host `[ec2-user@bastion]$ podman ps`. And make sure that there are files in the directory we specified for the container mounted volume `[ec2-user@bastion]$ ls ~/webserv/`. Beyond those tips, there are a number of ways things could have gone wrong, so do you best to diagnose and troubleshoot.
+
+With `wget` installed we can not retrieve the AAP 2.1 setup bundle (installer).
 
 ```
-wget http://mirror.ansiblemirror.com/setup-bundle.tar.gz
-tar xvf setup-bundle.tar.gz
-cd ansible-automation-platform-setup-bundle-2.1.1-2
+[ec2-user@controller]$ wget http://bastion.lab.private/setup-bundle.tar.gz
+[ec2-user@controller]$ tar xvf setup-bundle.tar.gz
+[ec2-user@controller]$ mv ansible-automation-platform-setup-bundle-*/ setup-bundle/
+[ec2-user@controller]$ cd setup-bundle/
+...
+[ec2-user@controller setup-bundle]$
 ```
 
 Edit the inventory file:
 
 ```
-vi inventory
+[ec2-user@controller setup-bundle]$ vi inventory
 ```
 
-Run the installer:
+Example inventory file:
+
+<pre><code>
+# Automation Controller Nodes
+# There are two valid node_types that can be assigned for this group.
+# A node_type=control implies that the node will only be able to run
+# project and inventory updates, but not regular jobs.
+# A node_type=hybrid will have the ability to run everything.
+# If you do not define the node_type, it defaults to hybrid.
+#
+# control.example node_type=control
+# hybrid.example  node_type=hybrid
+# hybrid2.example <- this will default to hybrid
+<strong>[automationcontroller]</strong>
+<strong>localhost ansible_connection=local</strong>
+
+[automationcontroller:vars]
+peers=execution_nodes
+
+
+# Execution Nodes
+# There are two valid node_types that can be assigned for this group.
+# A node_type=hop implies that the node will forward jobs to an execution node.
+# A node_type=execution implies that the node will be able to run jobs.
+# If you do not define the node_type, it defaults to execution.
+#
+# hop.example        node_type=hop
+# execution.example  node_type=execution
+# execution2.example <- this will default to execution
+[execution_nodes]
+
+[automationhub]
+
+[database]
+
+[servicescatalog_workers]
+
+# Single Sign-On
+# If sso_redirect_host is set, that will be used for application to connect to
+# SSO for authentication. This must be reachable from client machines.
+#
+# ssohost.example sso_redirect_host=&lt;host/ip&gt;
+[sso]
+
+[all:vars]
+<strong>admin_password='XXXXXXXX'</strong>
+
+pg_host=''
+pg_port=''
+
+pg_database='awx'
+pg_username='awx'
+<strong>pg_password='XXXXXXXX'</strong>
+pg_sslmode='prefer'  # set to 'verify-full' for client-side enforced SSL
+
+# Execution Environment Configuration
+# Credentials for container registry to pull execution environment images from,
+# registry_username and registry_password are required for registry.redhat.io
+<strong>#registry_url='registry.redhat.io'</strong>
+<strong>registry_url=''</strong>
+registry_username=''
+registry_password=''
+
+# Receptor Configuration
+#
+receptor_listener_port=27199
+
+# Automation Hub Configuration
+#
+
+<strong>automationhub_admin_password='XXXXXXXX'</strong>
+
+automationhub_pg_host=''
+automationhub_pg_port=''
+
+automationhub_pg_database='automationhub'
+automationhub_pg_username='automationhub'
+automationhub_pg_password=''
+automationhub_pg_sslmode='prefer'
+
+# When using Single Sign-On, specify the main automation hub URL that
+# clients will connect to (e.g. https://&lt;load balancer host&gt;).
+# If not specified, the first node in the [automationhub] group will be used.
+#
+# automationhub_main_url = ''
+
+# By default if the automation hub package and its dependencies
+# are installed they won't get upgraded when running the installer
+# even if newer packages are available. One needs to run the ./setup.sh
+# script with the following set to True.
+#
+# automationhub_upgrade = False
+
+# By default when one uploads collections to Automation Hub
+# an admin needs to approve it before it is made available
+# to the users. If one wants to disble the content approval
+# flow, the following setting should be set to False.
+#
+# automationhub_require_content_approval = True
+
+# At import time collections can go through a series of checks.
+# Behaviour is driven by galaxy-importer.cfg configuration.
+# Example are ansible-doc, ansible-lint, flake8, ...
+#
+# The following parameter allow one to drive this configuration.
+# This variable is expected to be a dictionnary.
+#
+# automationhub_importer_settings = None
+
+# The default install will deploy a TLS enabled Automation Hub.
+# If for some reason this is not the behavior wanted one can
+# disable TLS enabled deployment.
+#
+# automationhub_disable_https = False
+
+# The default install will deploy a TLS enabled Automation Hub.
+# Unless specified otherwise the HSTS web-security policy mechanism
+# will be enabled. This setting allows one to disable it if need be.
+#
+# automationhub_disable_hsts = False
+
+# The default install will generate self-signed certificates for the Automation
+# Hub service. If you are providing valid certificate via automationhub_ssl_cert
+# and automationhub_ssl_key, one should toggle that value to True.
+#
+# automationhub_ssl_validate_certs = False
+
+# SSL-related variables
+
+# If set, this will install a custom CA certificate to the system trust store.
+# custom_ca_cert=/path/to/ca.crt
+
+# Certificate and key to install in nginx for the web UI and API
+# web_server_ssl_cert=/path/to/tower.cert
+# web_server_ssl_key=/path/to/tower.key
+
+# Certificate and key to install in Automation Hub node
+# automationhub_ssl_cert=/path/to/automationhub.cert
+# automationhub_ssl_key=/path/to/automationhub.key
+
+# Server-side SSL settings for PostgreSQL (when we are installing it).
+# postgres_use_ssl=False
+# postgres_ssl_cert=/path/to/pgsql.crt
+# postgres_ssl_key=/path/to/pgsql.key
+
+# Keystore file to install in SSO node
+# sso_custom_keystore_file='/path/to/sso.jks'
+
+# The default install will deploy SSO with sso_use_https=True
+# Keystore password is required for https enabled SSO
+# sso_keystore_password=''
+
+# Single-Sign-On configuration
+sso_console_admin_password=''
+</code></pre>
+
+Once your inventroy is configured to your needs, run the installation script.
 
 ```
-sudo ./setup.sh
+[ec2-user@controller setup-bundle]$ sudo ./setup.sh
 ```
 
 ### sshuttle access
@@ -331,13 +562,17 @@ On the workstation, you will need to install sshuttle. Check the [sshuttle docum
 Once sshuttle is installed, to initiate the tunnel to allow you to access the AAP controller run the following in a terminal window (this will run in the background).
 
 ```
-sshuttle -r ec2-user@<mirror-instance-public-ip> <private-cidr-ip-network/cidr-block-size>
+sshuttle --ssh-cmd 'ssh -i <path-to-pem-key-file>' -r ec2-user@<bastion-public-ip> <your-VPC's-IPv4-CIDR-block> --dns
 ```
 
 Example:
 
 ```
-sshuttle -r ec2-user@54.211.183.248 10.0.135.16/24 --dns
+[user@workstation]$ sshuttle --ssh-cmd 'ssh -i ~/.ssh/aap_lab.pem' -r ec2-user@54.211.183.248 10.0.0.0/16 --dns
+c : Connected to server.
+...
 ```
 
-You will now be able to access the controller via your workstation's web browser at `http://aap.ansiblemirror.com`
+Leave this running in you terminal session. We will be switching over to a web browser to login to our newly installed Ansible Automation Platform 2.1 Automation Controller.
+
+Using your preferred web brower login at `http://controller.lab.private` as the `admin` user with the password you defined in the installer inventory file (i.e. `admin_password='XXXXXXXX'`). With `sshuttle` running in the background on your workstation, your web traffic targeting resources within the VPC are tunneled through the bastion host with the convenience of dns resoluton.
