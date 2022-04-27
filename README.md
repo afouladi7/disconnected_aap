@@ -154,34 +154,6 @@ Navigate to the EC2 Instances dashboard within the EC2 Service Dashboard"
     - Provide the private IP address
     - Allocate
 
-### Key Pair
-
-- Find your downloaded keypair. In my case it was located at `~/Downloads/aap_lab.pem`
-
-- Move it to the ~/.ssh/ directory
-
-  ```
-  mv ~/Downloads/aap_lab.pem ~/.ssh/
-  ```
-
-- Set the required permissions on our keyfile:
-
-  ```
-  chmod 600 ~/.ssh/aap_lab.pem
-  ```
-
-- SSH into the instance
-
-  ```
-  ssh -i ~/.ssh/aap_lab.pem ec2-user@<bastion-public-ip>
-  ```
-
-- Prepare the host
-
-  ```
-  sudo yum install podman wget python3 -y
-  ```
-
 ### Route 53 private hosted zone (optional)
 
 - Create a private dns with route 53 (optional)
@@ -211,47 +183,84 @@ Navigate to the EC2 Instances dashboard within the EC2 Service Dashboard"
     nslookup bastion.lab.private
     ```
 
-### Mirror Host Setup
+### Key Pair
 
-- On the bastion host
+- Find your downloaded keypair. In my case it was located at `~/Downloads/aap_lab.pem`
 
-- Create the webserv directory
-
-  ```
-  mkdir ~/webserv
-  ```
-
-- Login to the `registry.redhat.io` container registry
+- Move it to the ~/.ssh/ directory
 
   ```
-  podman login registry.redhat.io
+  mv ~/Downloads/aap_lab.pem ~/.ssh/
   ```
 
-- Setup run and configure the container for hosting a simple http file server
+- Set the required permissions on our keyfile:
 
   ```
-  podman run -d --name httpd -p 8080:8080 --restart=always -v /home/ec2-user/webserv:/var/www/html:Z rhel8/httpd-24
-  podman exec -it httpd rm /etc/httpd/conf.d/welcome.conf
-  podman restart httpd
+  chmod 600 ~/.ssh/aap_lab.pem
   ```
 
-- Ensure the container is up and running:
+- SSH into the instance
 
   ```
-  podman ps
+  ssh -i ~/.ssh/aap_lab.pem ec2-user@<bastion-public-ip>
   ```
 
-  Example output:
+- Prepare the host:
+
+  > When you first login to the bastion host the prompt will not have a pretty hostname such as `[ec2-user@bastion]$`. The default behavior of the EC2 instance is to display the private ip address of the instance (e.g. `[ec2-user@ip-10.0.10.101]$ `). For the purposes of this guide, in an effort to ease following along with which host I am operating on for the commands and instructions documented below, I depict the prompt with a "pretty" hostname from the start. If you decide to set each instance's hostname (as documented below), your prompts will match the promts in this guide after setting the instance hostname, logging out, and then logging back into the each respective host.
 
   ```
-  CONTAINER ID  IMAGE                                     COMMAND               CREATED         STATUS             PORTS                   NAMES
-  522788ae4e68  registry.redhat.io/rhel8/httpd-24:latest  /usr/bin/run-http...  40 minutes ago  Up 40 minutes ago  0.0.0.0:8080->8080/tcp  httpd
+  [ec2-user@bastion]$ sudo hostnamectl set-hostname bastion.lab.private
+  [ec2-user@bastion]$ exit
+  ...
+  [user@workstation]$ ssh -i ~/.ssh/aap_lab.pem ec2-user@<bastion-public-ip>
+  ...
+  [ec2-user@bastion]$
   ```
 
-  ! Legacy check step !
-  Does not work with the locked down security group. To be deleted.
+  Install a few packages. We install `wget` for pulling the AAP 2.1 Setup Bundle installer from the Red Hat CDN directly to the bastion host, `podman` will allow us to run the containerized webserver, and `python3` is not strictly required, but will allow us to create an ssh tunnel with `sshuttle` from our workstation into the private VPC network so we can access the AAP 2.1 Automation Controller web user interface after we have completed the installation.
 
-  - Go to your browser and go to the public IP of the Elastic IP, port 8080 (i.e. http://54.211.183.248:8080)
+  ```
+  [ec2-user@bastion]$ sudo yum install podman wget python3 -y
+  [ec2-user@bastion]$
+  ```
+
+### Create the mirrored resources and webserver
+
+On the bastion host create a `webserv` directory. We will store all of the recourses that our controller instance we need access to in this directory.
+
+```
+mkdir ~/webserv
+```
+
+Next we will run and configure the container for serving these resources.
+
+First login to the `registry.redhat.io` container registry so we can pull the required container image.
+
+```
+podman login registry.redhat.io
+```
+
+Next we will run the container image, exposing port 8080, and mounting the `webserv` directory as a mounted volume inside of the container. Once the container runs successfully, we will delete the `/etc/httpd/conf.d/welcome.conf` inside of the container, and finally restart the container.
+
+```
+podman run -d --name httpd -p 8080:8080 --restart=always -v /home/ec2-user/webserv:/var/www/html:Z rhel8/httpd-24
+podman exec -it httpd rm /etc/httpd/conf.d/welcome.conf
+podman restart httpd
+```
+
+Ensure the container is up and running:
+
+```
+podman ps
+```
+
+Example output:
+
+```
+CONTAINER ID  IMAGE                                     COMMAND               CREATED         STATUS             PORTS                   NAMES
+522788ae4e68  registry.redhat.io/rhel8/httpd-24:latest  /usr/bin/run-http...  40 minutes ago  Up 40 minutes ago  0.0.0.0:8080->8080/tcp  httpd
+```
 
 #### Prepare the AAP Bundle Installer
 
@@ -319,7 +328,7 @@ Disable the default yum repos that point to the RHUI infrastructure. We will be 
 Next we will create our own yum repo definitions as follows:
 
 ```
-$ cat << EOF | sudo tee -a /etc/yum.repos.d/bastion.repo
+$ cat << EOF | sudo tee -a /etc/yum.repos.d/bastion-mirror.repo
 [rhel-8-baseos-mirror]
 name = Local Mirror of RHEL 8 BaseOS RPMs
 baseurl = http://bastion.lab.private:8080/rhel-8-baseos-rhui-rpms/
@@ -328,7 +337,7 @@ gpgcheck = 1
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 
 [rhel-8-appstream-rhui-mirror]
-name = Local Mirror of RHEL 8 AppStream rhui
+name = Local Mirror of RHEL 8 AppStream RPMs
 baseurl = http://bastion.lab.private:8080/rhel-8-appstream-rhui-rpms/
 enabled = 1
 gpgcheck = 1
@@ -371,7 +380,7 @@ Hopefully everything is configured correctly and you were able to install the wg
 With `wget` installed we can not retrieve the AAP 2.1 setup bundle (installer).
 
 ```
-[ec2-user@controller]$ wget http://bastion.lab.private/setup-bundle.tar.gz
+[ec2-user@controller]$ wget http://bastion.lab.private:8080/setup-bundle.tar.gz
 [ec2-user@controller]$ tar xvf setup-bundle.tar.gz
 [ec2-user@controller]$ mv ansible-automation-platform-setup-bundle-*/ setup-bundle/
 [ec2-user@controller]$ cd setup-bundle/
