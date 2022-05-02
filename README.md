@@ -201,52 +201,52 @@ Configure the new instance for our `controller` host as follows:
 
 ### Key Pair
 
-- Find your downloaded keypair. In my case it was located at `~/Downloads/labkey.pem`
+The keypair that we created for or ec2 instance should have been downloaded to your workstation.  We need to set the correct permissions on this file, and for convenience we will move it to the `~/.ssh/` directory.
 
-- Move it to the ~/.ssh/ directory
+Find your downloaded keypair. In my case it was located at `~/Downloads/labkey.pem`, and move it to the ~/.ssh/ directory:
 
-  ```
-  mv ~/Downloads/labkey.pem ~/.ssh/
-  ```
+```
+mv ~/Downloads/labkey.pem ~/.ssh/
+```
 
-- Set the required permissions on our keyfile:
+Set the required permissions on our keyfile:
 
-  ```
-  chmod 600 ~/.ssh/labkey.pem
-  ```
+```
+chmod 600 ~/.ssh/labkey.pem
+```
 
-- SSH into the instance
+SSH into the bastion instance:
 
-  ```
-  ssh -i ~/.ssh/labkey.pem ec2-user@<bastion-public-ip>
-  ```
+```
+ssh -i ~/.ssh/labkey.pem ec2-user@<bastion-public-ip>
+```
 
-- Prepare the host:
+Prepare the host:
 
-  > When you first login to the bastion host the prompt will not have a pretty hostname such as `[ec2-user@bastion]$`. The default behavior of the EC2 instance is to display the private ip address of the instance (e.g. `[ec2-user@ip-10.0.10.101]$ `). For the purposes of this guide, in an effort to ease following along with which host I am operating on for the commands and instructions documented below, I depict the prompt with a "pretty" hostname from the start. If you decide to set each instance's hostname (as documented below), your prompts will match the promts in this guide after setting the instance hostname, logging out, and then logging back into the each respective host.
+> When you first login to the bastion host the prompt will not have a pretty hostname such as `[ec2-user@bastion]$`. The default behavior of the EC2 instance is to display the private ip address of the instance (e.g. `[ec2-user@ip-10.0.10.101]$ `). For the purposes of this guide, in an effort to ease following along with which host I am operating on for the commands and instructions documented below, I depict the prompt with a "pretty" hostname from the start. If you decide to set each instance's hostname (as documented below), your prompts will match the promts in this guide after setting the instance hostname, logging out, and then logging back into the each respective host.
 
-  ```
-  [ec2-user@bastion]$ sudo hostnamectl set-hostname bastion.lab.private
-  [ec2-user@bastion]$ exit
-  ...
-  [user@workstation]$ ssh -i ~/.ssh/labkey.pem ec2-user@<bastion-public-ip>
-  ...
-  [ec2-user@bastion]$
-  ```
+```
+[ec2-user@<bastion-ip>]$ sudo hostnamectl set-hostname bastion.lab.private
+[ec2-user@<bastion-ip>]$ exit
+...
+[user@workstation]$ ssh -i ~/.ssh/labkey.pem ec2-user@<bastion-public-ip>
+...
+[ec2-user@bastion]$
+```
 
-  Install a few packages. We install `wget` for pulling the AAP 2.1 Setup Bundle installer from the Red Hat CDN directly to the bastion host, `podman` will allow us to run the containerized webserver, and `python3` is not strictly required, but will allow us to create an ssh tunnel with `sshuttle` from our workstation into the private VPC network so we can access the AAP 2.1 Automation Controller web user interface after we have completed the installation.
+Install a few packages. We install `wget` for pulling the AAP 2.1 Setup Bundle installer from the Red Hat CDN directly to the bastion host, `podman` will allow us to run the containerized webserver, and `python3` is not strictly required, but will allow us to create an ssh tunnel with `sshuttle` from our workstation into the private VPC network so we can access the AAP 2.1 Automation Controller web user interface after we have completed the installation.
 
-  ```
-  [ec2-user@bastion]$ sudo yum install podman wget python3 -y
-  [ec2-user@bastion]$
-  ```
+```
+[ec2-user@bastion]$ sudo yum install podman wget python3 -y
+[ec2-user@bastion]$
+```
 
 ### Create the mirrored resources and webserver
 
 On the bastion host create a `webserv` directory. We will store all of the recourses that our controller instance we need access to in this directory.
 
 ```
-mkdir ~/webserv
+[ec2-user@bastion]$ mkdir ~/webserv
 ```
 
 Next we will run and configure the container for serving these resources.
@@ -254,21 +254,21 @@ Next we will run and configure the container for serving these resources.
 First login to the `registry.redhat.io` container registry so we can pull the required container image.
 
 ```
-podman login registry.redhat.io
+[ec2-user@bastion]$ podman login registry.redhat.io
 ```
 
 Next we will run the container image, exposing port 8080, and mounting the `webserv` directory as a mounted volume inside of the container. Once the container runs successfully, we will delete the `/etc/httpd/conf.d/welcome.conf` inside of the container, and finally restart the container.
 
 ```
-podman run -d --name httpd -p 8080:8080 --restart=always -v /home/ec2-user/webserv:/var/www/html:Z rhel8/httpd-24
-podman exec -it httpd rm /etc/httpd/conf.d/welcome.conf
-podman restart httpd
+[ec2-user@bastion]$ podman run -d --name httpd -p 8080:8080 --restart=always -v /home/ec2-user/webserv:/var/www/html:Z rhel8/httpd-24
+[ec2-user@bastion]$ podman exec -it httpd rm /etc/httpd/conf.d/welcome.conf
+[ec2-user@bastion]$ podman restart httpd
 ```
 
 Ensure the container is up and running:
 
 ```
-podman ps
+[ec2-user@bastion]$ podman ps
 ```
 
 Example output:
@@ -285,33 +285,17 @@ CONTAINER ID  IMAGE                                     COMMAND               CR
 - Then on the bastion host:
 
 ```
-wget -O ~/webserv/setup-bundle.tar.gz -c "<the link you copied from the downloads page>"
+[ec2-user@bastion]$ wget -O ~/webserv/setup-bundle.tar.gz -c "<the link you copied from the downloads page>"
 ```
 
 #### Mirror the required RHEL 8 repositories
 
-On the mirror host
+On the bastion instance
 
 ```
-sudo reposync -p ~/webserv/ --download-metadata --repo=rhel-8-baseos-rhui-rpms
-sudo reposync -p ~/webserv/ --download-metadata --repo=rhel-8-appstream-rhui-rpms
+[ec2-user@bastion]$ sudo reposync -p ~/webserv/ --download-metadata --repo=rhel-8-baseos-rhui-rpms
+[ec2-user@bastion]$ sudo reposync -p ~/webserv/ --download-metadata --repo=rhel-8-appstream-rhui-rpms
 ```
-
-#### AAP Instance
-
-- Create another ec2 instace with the same process as before:
-- t2.xlarge
-- Put it in the private subnet
-- Again 100 GiB volume
-- Tag: {Name: aap2}
-- Security Group:
-  - All traffic from anywhere
-  - Note, because it is in the private security group
-- Associtate the same keypair
-- Create instance
-
-- Route 53
-  - Add an A record `aap` pointing to the private IP of the aap instance
 
 ### Copy the keypair
 
@@ -331,6 +315,8 @@ From you workstation:
 
 ```
 [ec2-user@bastion]$ ssh -i ~/.ssh/labkey.pem ec2-user@controller.lab.private
+...
+[ec2-user@controller]$
 ```
 
 ### Disable the default RHUI yum repos
@@ -344,7 +330,7 @@ Disable the default yum repos that point to the RHUI infrastructure. We will be 
 Next we will create our own yum repo definitions as follows:
 
 ```
-$ cat << EOF | sudo tee -a /etc/yum.repos.d/bastion-mirror.repo
+[ec2-user@controller]$ cat << EOF | sudo tee -a /etc/yum.repos.d/bastion-mirror.repo
 [rhel-8-baseos-mirror]
 name = Local Mirror of RHEL 8 BaseOS RPMs
 baseurl = http://bastion.lab.private:8080/rhel-8-baseos-rhui-rpms/
@@ -556,10 +542,10 @@ Once your inventroy is configured to your needs, run the installation script.
 
 If for using sshuttle to connect to the AAP Controller Host you may need to install python on the mirror instance for sshuttle to be able to create the required tunnel to the private network.
 
-On the mirror instance:
+If you did not do so in the previous steps for setting up the bastion instance, you will need to install `python3` on the mirror instance to be able to create an ssh tunnel utilizing `sshuttle`:
 
 ```
-sudo yum install python3 -y
+[ec2-user@bastion]$ sudo yum install python3 -y
 ```
 
 On the workstation, you will need to install sshuttle. Check the [sshuttle documentation](https://sshuttle.readthedocs.io/en/stable/overview.html) for the installation method for you workstation's host.
