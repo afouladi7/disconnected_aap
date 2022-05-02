@@ -35,38 +35,37 @@ At the top of the VPC Dashboard click the "Launch VPC Wizard" button to begin cr
 
 On the "Create VPC" page in the "VPC Settings" column we will configure our VPC as follows:
 
-![Create VPC](img/1_vpc/create-vpc-1.png)
+![Create VPC](img/1_vpc/create-vpc-0.png)
 
-|                           |                                              |
-| ------------------------- | -------------------------------------------- |
-| Resources to create       | Select "VPC, subnets, etc."                  |
-|                           |                                              |
-| Name tag auto-generation  |                                              |
-| Auto-generate             | Enabled                                      |
-|                           | Provide a name for your VPC (e.g. `aap_lab`) |
-| IPv4 CIDR block           | Leave default (i.e. 10.0.0.0/16)             |
-| IPv6 CIDR block           | Select "No IPv^ CIDR block (default)         |
-| Tenency                   | Default                                      |
-|                           |                                              |
-| Availability Zones (AZs)  | 1                                            |
-| Number of public subnets  | 1                                            |
-| Number of private subnets | 1                                            |
-| NAT gateways ($)          | None                                         |
-| VPC endpoints             | None                                         |
-|                           |                                              |
-| DNS options               |                                              |
-| Enable DNS hostname       | Enabled (not default)                        |
-| Enable DNS resolution     | Enabled (default)                            |
+|                           |                                             |
+| ------------------------- | ------------------------------------------- |
+| Resources to create       | Select "VPC, subnets, etc."                 |
+|                           |                                             |
+| Name tag auto-generation  |                                             |
+| Auto-generate             | Enabled                                     |
+|                           | Provide a name for your VPC (e.g. `labenv`) |
+| IPv4 CIDR block           | Leave default (i.e. 10.0.0.0/16)            |
+| IPv6 CIDR block           | Select "No IPv^ CIDR block (default)        |
+| Tenency                   | Default                                     |
+|                           |                                             |
+| Availability Zones (AZs)  | 1                                           |
+| Number of public subnets  | 1                                           |
+| Number of private subnets | 1                                           |
+| NAT gateways ($)          | None                                        |
+| VPC endpoints             | None                                        |
+|                           |                                             |
+| DNS options               |                                             |
+| Enable DNS hostname       | Enabled (not default)                       |
+| Enable DNS resolution     | Enabled (default)                           |
 
 Example:
-![VPC settings 1](img/1_vpc/create-vpc-2.png)
-![VPC settings 2](img/1_vpc/create-vpc-3.png)
+
+![VPC settings 1](img/1_vpc/create-vpc-1.png)
+![VPC settings 2](img/1_vpc/create-vpc-2.png)
 
 ! Take note of the IPv4 CIDR block. We will need this later in establishing our sshuttle tunnel into the VPC to access our deployed resources from our workstation.
 
 Finally, click "Create VPC".
-
-![Create VPC workflow](img/1_vpc/create-vpc-workflow.png)
 
 Once the "Create VPC workflow" has completed we can move on by clicking the "View VPC" button at the bottom of the page.
 
@@ -78,81 +77,102 @@ We will need to create a security group that limits the inbound and outbound tra
 
 To begin, we will navigate to the AWS Console Service Catalog, search for and navigate to the EC2 Service page.
 
-![EC2 Service](img/2_ssg/ec2-service.png)
+![EC2 Service](img/2_sg/ec2-service.png)
 
-On the EC2 Dashboard we will navigate to the Security Group section from the "Resouces" card by clicking on the "Security Groups" link.
+On the EC2 Dashboard we will navigate to the Security Group section from the "Resouces" card by clicking on the "Security Groups" link. Alternatively, Security Groups can be found in the sidebar on the left hand side of the page.
 
-![EC2 Dash - Security Group link](img/2_ssg/ec2-dash-ssg.png)
+![EC2 Dash - Security Group link](img/2_sg/ec2-dash-ssg.png)
 
 Once you reach the Security Groups dashboard, you will notice that there is already a default security group defined. We will leave that one as it is, and we will begin creating our own security group by clicking the "Create security group" button in the top right of the page.
 
-![SSG Dash](img/2_ssg/ssg-dash.png)
+![SSG Dash](img/2_sg/sg-dash.png)
 
-On the "Create security group" page we will fill out the fields for "Security group name", "Description", and make sure that the automatically selected VPC is correct.
+On the "Create security group" page we will fill out the fields for "Security group name" (i.e. `labenv`), "Description" (e.g. `Lab environment security group`), and make sure that the automatically selected VPC is correct.
 
 From there we will add a single Inbound rule by clicking the "Add rule" on the "Inbound rules" card. In fields for the newly created rule, in the "Type" column select "SSH" from the dropdown menu, and in the "Source" column select "Anywhere - IPv4" from the dropdown menu. You're newly created security group should look like the folowing before continuing by clicking the "Create security group" button at the bottom right of the page.
 
-![Create SSG 1A](img/2_ssg/create-ssg-1a.png)
-![Create SSG 1B](img/2_ssg/create-ssg-1b.png)
+![Create SG 1](img/2_sg/create-sg-1.png)
 
-The second step is to modify or newly created `aap_lab_ssg` to allow all traffic from within the security group.
-After creating the Security Group you will be taken to the `aap_lab_ssg` Security Group dashboard. To add another inbound rule, select the "Edit inbound rules" button on the "Inbound rules" card at the bottom of the page.
+The second step is to modify or newly created `labenv` security group to allow all traffic from within the security group.
+After creating the Security Group you will be taken to the `labenv` security group overview page. To add another inbound rule, select the "Edit inbound rules" button on the "Inbound rules" card at the bottom of the page.
 
-![Edit inbound rules](img/2_ssg/edit-inbound-rules.png)
+![Security Group Created - Phase 1](img/2_sg/sg-created.png)
 
-On the "Edit inbound rules" page, create a new rule by clicking "Add rule" and fill out the new rule "Type" with "All traffic" from the dropdown menu. In the "Source" column, select the security group `aap_lab_ssg` by clicking the magnifying glass and scrolling down until you find the correct security group. You're new rule should look similar to the below example, but note that the security group id will be different from the example.
+On the "Edit inbound rules" page, create a new rule by clicking "Add rule" and fill out the new rule "Type" with "All traffic" from the dropdown menu. In the "Source" column, select the security group `labenv` by clicking the magnifying glass and scrolling down until you find the correct security group. You're new rule should look similar to the below example, but note that the security group id will be different from the example.
 
-![Edit inbound rules 2](img/2_ssg/edit-inbound-rules-2.png)
+![Edit inbound rules 1](img/2_sg/edit-inbound-rules-1.png)
+![Edit inbound rules 2](img/2_sg/edit-inbound-rules-2.png)
 
 Once you have completed editing the security group rules, proceed by clicking "Save rules" at the bottom of the page.
 
-### Elastic IPs
-
-- Go to Elastic IPs
-- Allocate Elastic IP Addresses
-- Use the standard/default options
-- Allocate 1 Elastic IP
 
 ### Instances
 
 Next we will begin depolying our EC2 instances.
-Navigate to the EC2 Instances dashboard within the EC2 Service Dashboard"
+
+For all of the instances we will need we will be using a Red Hat Gold Image (ami `ami-0479495a9957581b9`) with the `t2.xlarge` instance type.
+
+Navigate to the EC2 Instances page either from the EC2 Service Dashboard or via the navigation sidebar on the left of the page.
+
+![EC2 Instance Page (empty)](img/3_bastion/ec2-instance-page.png)
+
+In the top right hand corner, select the "Launch instances" button.
 
 #### Bastion Host
 
-![Instance Wizard - Bastion 1](img/3_bastion/bastion-1.png)
-![Instance Wizard - Bastion 2](img/3_bastion/bastion-2.png)
-![Instance Wizard - Bastion 3](img/3_bastion/bastion-3.png)
-![Instance Wizard - Bastion 4](img/3_bastion/bastion-4.png)
-![Instance Wizard - Bastion 5](img/3_bastion/bastion-5.png)
-![Instance Wizard - Bastion 6](img/3_bastion/bastion-6.png)
+Configure the new instance for our `bastion` host as follows:
 
-- Launch Instance
-- Use the `ami-0b0af3577fe5e3532` ami images
+- Name: `bastion`
+- Use the `ami-0479495a9957581b9` ami images
   - This is a gold image provided by Red Hat
+  - You may need to select "Browse more AMIs" to find the correct ami
+    - On the "Browse more AMIs" page, select the "My AMIs" tab under the search bar.
+    - Under the "Refine results" column, select the "Shared with me" checkbox to browse the Red Hat Gold Images.
+    - The above ami id references the ami titled "RHEL-8.5_HVM-20220127-x86_64-3-Access2-GP2"
 - t2.xlarge instace (4 vCPUs, 16 GiB Memory)
-- Step 3: Configure Instance Details
+- Create a new keypair for our environment (e.g. `labkey`)
+- Step 3: Configure Network Settings
+  - Select "Edit"
   - Ensure it is in the correct VPC
   - Subnet: Ensure it is in the public subnet
-  - Leave the reaminder of the options default
-- Step 4:
-  - Set 100 GiB of EBS
-- Step 5: Add Tags
-  - Key: Name; Value: mirror
-- Step 6: Configure Security Group
-  - Add rule for `All traffic` from anywhere
-- Step 7: Create a keypair
-  - ansible_mirror, type RSA
-  - Download the keypair
+  - Enable Auto-assigned public IP for the bastion host
+  - Check "Select existing security group" and assign the instance to the `labenv` security group
+- Step 4: Configure storage
+  - Set 100 GiB of EBS (gp2) for the root volume
 - Launch the instance
 
-- Go back to Elastic IPs,
+![Instance - Bastion 1](img/3_bastion/instance-bastion-1.png)
+![Instance - Bastion 2](img/3_bastion/instance-bastion-2.png)
 
-  - Select the previously created Elastic IP
-  - Actions drop down menu > "Allocate Elastic IP address"
-    - Provide the instance
-    - Provide the private IP address
-    - Allocate
+#### Controller Host
+
+We will repeat the same process we used to create the `bastion` host in the previous step to now create our `controller` host.
+
+The main differences between the `bastion` host and the `controller` host are that the `controller` will be assigned to our private subnet and we will not assign it a public IP address.
+
+Configure the new instance for our `controller` host as follows:
+
+- Name: `controller`
+- Use the `ami-0479495a9957581b9` ami images
+  - This is a gold image provided by Red Hat
+  - You may need to select "Browse more AMIs" to find the correct ami
+    - On the "Browse more AMIs" page, select the "My AMIs" tab under the search bar.
+    - Under the "Refine results" column, select the "Shared with me" checkbox to browse the Red Hat Gold Images.
+    - The above ami id references the ami titled "RHEL-8.5_HVM-20220127-x86_64-3-Access2-GP2"
+- t2.xlarge instace (4 vCPUs, 16 GiB Memory)
+- Assign the same keypair that we created in the previous step (e.g. `labkey`)
+- Step 3: Configure Network Settings
+  - Select "Edit"
+  - Ensure it is in the correct VPC
+  - Subnet: Ensure it is in the **private subnet**
+  - Leave the Auto-assigned public IP setting Disabled
+  - Check "Select existing security group" and assign the instance to the `labenv` security group
+- Step 4: Configure storage
+  - Set 100 GiB of EBS (gp2) for the root volume
+- Launch the instance
+
+![Instance - Controller 1](img/3_bastion/instance-controller-1.png)
+![Instance - Controller 2](img/3_bastion/instance-controller-2.png)
 
 ### Route 53 private hosted zone (optional)
 
@@ -166,7 +186,7 @@ Navigate to the EC2 Instances dashboard within the EC2 Service Dashboard"
       - Assign the private domain to the correct VPC
       - "Create"
     - Create records
-      - We will be creating two A records within our private hosted zone. One for the bastion and one for the controller. If you do not have the _**private IPv4**_ addresses for you two newly created instances, take a moment to jump back over to the EC2 Instances dashboard and make a note of those now.
+      - We will be creating two A records within our private hosted zone. One for the bastion and one for the controller. If you do not have the _**private IPv4**_ addresses for your two newly created instances, take a moment to jump back over to the EC2 Instances dashboard and make a note of those now.
       - For each record we will configure them as follows:
         | | |
         |-|-|
@@ -178,31 +198,27 @@ Navigate to the EC2 Instances dashboard within the EC2 Service Dashboard"
     (Optional) Confirm the records
     On the bastion host:
 
-    ```
-    yum install bind-utils -y
-    nslookup bastion.lab.private
-    ```
 
 ### Key Pair
 
-- Find your downloaded keypair. In my case it was located at `~/Downloads/aap_lab.pem`
+- Find your downloaded keypair. In my case it was located at `~/Downloads/labkey.pem`
 
 - Move it to the ~/.ssh/ directory
 
   ```
-  mv ~/Downloads/aap_lab.pem ~/.ssh/
+  mv ~/Downloads/labkey.pem ~/.ssh/
   ```
 
 - Set the required permissions on our keyfile:
 
   ```
-  chmod 600 ~/.ssh/aap_lab.pem
+  chmod 600 ~/.ssh/labkey.pem
   ```
 
 - SSH into the instance
 
   ```
-  ssh -i ~/.ssh/aap_lab.pem ec2-user@<bastion-public-ip>
+  ssh -i ~/.ssh/labkey.pem ec2-user@<bastion-public-ip>
   ```
 
 - Prepare the host:
@@ -213,7 +229,7 @@ Navigate to the EC2 Instances dashboard within the EC2 Service Dashboard"
   [ec2-user@bastion]$ sudo hostnamectl set-hostname bastion.lab.private
   [ec2-user@bastion]$ exit
   ...
-  [user@workstation]$ ssh -i ~/.ssh/aap_lab.pem ec2-user@<bastion-public-ip>
+  [user@workstation]$ ssh -i ~/.ssh/labkey.pem ec2-user@<bastion-public-ip>
   ...
   [ec2-user@bastion]$
   ```
@@ -302,7 +318,7 @@ sudo reposync -p ~/webserv/ --download-metadata --repo=rhel-8-appstream-rhui-rpm
 From you workstation:
 
 ```
-[user@workstation]$ scp ~/.ssh/aap_lab.pem ec2-user@<bastion-public-ip>:~/.ssh/
+[user@workstation]$ scp ~/.ssh/labkey.pem ec2-user@<bastion-public-ip>:~/.ssh/
 ```
 
 ### SSH into AAP Host
@@ -310,11 +326,11 @@ From you workstation:
 - SSH into the bastion host, and then from there ssh into the controller host
 
 ```
-[user@workstation]$ ssh -i ~/.ssh/aap_lab.pem ec2-user@<bastion-public-ip>
+[user@workstation]$ ssh -i ~/.ssh/labkey.pem ec2-user@<bastion-public-ip>
 ```
 
 ```
-[ec2-user@bastion]$ ssh -i ~/.ssh/aap_lab.pem ec2-user@controller.lab.private
+[ec2-user@bastion]$ ssh -i ~/.ssh/labkey.pem ec2-user@controller.lab.private
 ```
 
 ### Disable the default RHUI yum repos
@@ -344,26 +360,6 @@ gpgcheck = 1
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 EOF
 ```
-
-<!--- COMMENT START: old meathod, switching to using sed for disabling the repos and tee for creating a new repo file pointing to the bastion
-
-```
-sudo vi /etc/yum.repo.d/redhat-rhui.repo
-:%s/enabled=1/enabled=0/gc
-:wq
-```
-
-```
-sudo vi /etc/yum.repo.d/redhat-rhui-client-config.repo
-:%s/enabled=1/enabled=0/gc
-:wq
-```
-
-```
-sudo vi /etc/yum.repo.d/redhat-rhui.repo
-```
-
-COMMENT END -->
 
 ### Pull the setup bundle to the controller host
 
@@ -577,7 +573,7 @@ sshuttle --ssh-cmd 'ssh -i <path-to-pem-key-file>' -r ec2-user@<bastion-public-i
 Example:
 
 ```
-[user@workstation]$ sshuttle --ssh-cmd 'ssh -i ~/.ssh/aap_lab.pem' -r ec2-user@54.211.183.248 10.0.0.0/16 --dns
+[user@workstation]$ sshuttle --ssh-cmd 'ssh -i ~/.ssh/labkey.pem' -r ec2-user@54.211.183.248 10.0.0.0/16 --dns
 c : Connected to server.
 ...
 ```
